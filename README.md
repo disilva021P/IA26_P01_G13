@@ -19,4 +19,4 @@
 pip install -r requirements.txt
 jupyter notebook          # abrir EDA.ipynb e Proj01.ipynb e usar "Run All"
 ```
-Os notebooks leem os CSV da pasta `data/` (caminho relativo), por isso devem ser executados a partir da pasta onde estão.
+Os notebooks leem os CSV da pasta `data_tiny/` (caminho relativo), por isso devem ser executados a partir da pasta onde estão.
