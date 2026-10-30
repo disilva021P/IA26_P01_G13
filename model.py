@@ -118,6 +118,81 @@ class Problem:
         """Função de custo de uma ação: distância + penalização do atraso."""
         return km + self.late_penalty * late_min
 
+    # ---------------------------------------------------------------- ações
+    def actions(self, s, v):
+        """Ações possíveis (sintaticamente) do veículo v no estado s; apply() verifica as restrições."""
+        out, carrying_raw = [], False
+        for r in range(self.n):
+            c = s.status[r]
+            if c == self.PENDING:
+                out.append((PICK, r))
+            elif c == 1 + v:
+                carrying_raw = True
+                out.append((LOAD, r))
+            elif c == self.WH:
+                out.append((LOAD, r))
+            elif c == self.ONB + v:
+                out.append((DELIVER, r))
+        if carrying_raw:
+            out.append((CENTER, None))
+        return out
+
+    def apply(self, s, v, act):
+        """
+        Aplica a ação `act = (tipo, r)` ao veículo v.
+        Devolve (novo_estado, km, atraso_min), ou None se viola uma restrição hard, ou BLOCKED se depende de outro veículo.
+        O custo da ação é step_cost(km, atraso_min).
+        """
+        typ, r = act
+        loc, t, load = s.veh[v]
+        D, T, C = self.D, self.T, self.veh[v].center
+
+        if typ == PICK:
+            q = self.req[r]
+            if s.status[r] != self.PENDING or load + q.w > self.cap[v] + EPS:
+                return None
+            arrive = t + T[loc][q.p]
+            if arrive > q.a_end + EPS:                       # chega depois do fim da janela de recolha
+                return None
+            t2 = max(arrive, q.a) + SERVICE_MIN              # espera pelo início da janela
+            return self._new(s, v, (q.p, t2, load + q.w), {r: (1 + v, 0.0)}), D[loc][q.p], 0.0
+
+        if typ == DELIVER:
+            q = self.req[r]
+            if s.status[r] != self.ONB + v:
+                return None
+            t_del = max(t + T[loc][q.d], q.e)                # espera pelo início da janela de entrega
+            late = max(0.0, t_del - q.l)                     # restrição soft: atraso penalizado
+            return self._new(s, v, (q.d, t_del + SERVICE_MIN, load - q.w), {r: (self.DONE, 0.0)}), D[loc][q.d], late
+
+        # LOAD / CENTER: o veículo vai ao centro, descarrega no armazém tudo o que trazia "cru" e (se LOAD) carrega r
+        if typ == LOAD and s.status[r] not in (1 + v, self.WH):
+            pend_or_other_raw = s.status[r] == self.PENDING or 1 <= s.status[r] <= self.K
+            return BLOCKED if pend_or_other_raw else None
+        t1 = t + T[loc][C]
+        changes, load2 = {}, load
+        for q in range(self.n):
+            if s.status[q] == 1 + v:                         # descarrega os pedidos "crus" deste veículo
+                changes[q] = (self.WH, round(t1, 4))
+                load2 -= self.w[q]
+        t2 = t1
+        if typ == LOAD:
+            wt_r = changes[r][1] if r in changes else s.wt[r]
+            t2 = max(t1, wt_r)                               # espera, se preciso, que o pedido chegue ao armazém
+            if load2 + self.w[r] > self.cap[v] + EPS:
+                return None
+            changes[r] = (self.ONB + v, 0.0)
+            load2 += self.w[r]
+        return self._new(s, v, (C, t2 + SERVICE_MIN, max(load2, 0.0)), changes), D[loc][C], 0.0
+
+    @staticmethod
+    def _new(s, v, veh_v, changes):
+        veh = s.veh[:v] + ((veh_v[0], round(veh_v[1], 4), veh_v[2]),) + s.veh[v + 1:]
+        status, wt = list(s.status), list(s.wt)
+        for r, (code, w_time) in changes.items():
+            status[r], wt[r] = code, w_time
+        return State(veh, tuple(status), tuple(wt))
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Leitura dos dados
