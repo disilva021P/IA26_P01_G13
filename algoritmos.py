@@ -2,6 +2,7 @@
 algoritmos.py — Algoritmos do projeto "Comida Local" (Trabalho de IA, UPCA 2026-27), sobre o modelo de model.py.
 
   1. Pesquisa informada : Greedy e A* (best_first) com duas heurísticas admissíveis (h_chain, h_disjoint)
+<<<<<<< HEAD
   2. Pesquisa local     : Hill Climbing sobre uma solução inicial (hill_climbing)
 
 Custo = distância (km) + LATE_PENALTY * minutos de atraso (ver model.py). Uma solução é uma lista de ações por veículo (rotas).
@@ -9,6 +10,14 @@ Custo = distância (km) + LATE_PENALTY * minutos de atraso (ver model.py). Uma s
 import heapq, itertools, math, random, time
 
 from model import PICK, LOAD, CENTER, DELIVER, BLOCKED, EPS
+=======
+
+Custo = distância (km) + LATE_PENALTY * minutos de atraso. Uma solução é uma lista de ações por veículo (rotas).
+"""
+import heapq, itertools, math, time
+
+from model import BLOCKED, EPS
+>>>>>>> 2c8d1b1a47c1f52fa4e6bf3ef33a47cedc5e08fb
 
 # ======================================================================================================================
 # 1. PESQUISA INFORMADA
@@ -166,6 +175,7 @@ def best_first(P, h, mode="astar", weight=1.0, max_nodes=200000, time_limit=60, 
         res = P.simulate(plan_to_routes(P, plan))            # custo recalculado pelo simulador do modelo
         out.update(plan=plan, cost=res["cost"], km=res["km"], late_min=res["late_min"])
     return out
+<<<<<<< HEAD
 
 # ======================================================================================================================
 # 2. PESQUISA LOCAL — HILL CLIMBING
@@ -271,3 +281,5 @@ def initial_solution(P, h=h_chain, weights=(1.0, 2.0, 5.0, 20.0), max_nodes=2000
             return plan_to_routes(P, res["plan"]), res
     res = best_first(P, h, mode="greedy", max_nodes=max_nodes * 5, time_limit=time_limit * 2)
     return (plan_to_routes(P, res["plan"]), res) if res["found"] else (None, None)
+=======
+>>>>>>> 2c8d1b1a47c1f52fa4e6bf3ef33a47cedc5e08fb
