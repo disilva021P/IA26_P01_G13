@@ -11,11 +11,7 @@
 | `Proj01.ipynb` | Notebook principal: introdução, problema, modelação, resultados e conclusão |
 | `EDA.ipynb` | Análise exploratória dos dados |
 | `model.py` | Modelo do problema: pedidos, veículos, estado, ações, função de custo, simulador e verificador (`audit`) |
-<<<<<<< HEAD
-| `algoritmos.py` | Algoritmos: Greedy e A* (`best_first`), Hill Climbing e solução inicial (`initial_solution`, `temporal_groups`) |
-=======
-| `algoritmos.py` | Algoritmos: Greedy e A* (`best_first`) |
->>>>>>> 2c8d1b1a47c1f52fa4e6bf3ef33a47cedc5e08fb
+| `algoritmos.py` | Algoritmos: Greedy e A* (`best_first`), Hill Climbing e CSP (`csp_solve`, `csp_complete`) |
 | `data_tiny/` | Dataset (CSV, versão *tiny*): produtores, clientes, encomendas, veículos, matriz de distâncias, etc. |
 | `requirements.txt` | Dependências Python |
 
