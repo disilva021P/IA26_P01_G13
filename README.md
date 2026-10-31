@@ -10,8 +10,9 @@
 |---|---|
 | `Proj01.ipynb` | Notebook principal: introdução, problema, modelação, resultados e conclusão |
 | `EDA.ipynb` | Análise exploratória dos dados |
-| `data/` | Dataset (CSV, versão *tiny*): produtores, clientes, encomendas, veículos, matriz de distâncias, etc. |
-| `model.py` | código python com o código do modelo
+| `model.py` | Modelo do problema: pedidos, veículos, estado, ações, função de custo, simulador e verificador (`audit`) |
+| `algoritmos.py` | Algoritmos: Greedy e A* (`best_first`) |
+| `data_tiny/` | Dataset (CSV, versão *tiny*): produtores, clientes, encomendas, veículos, matriz de distâncias, etc. |
 | `requirements.txt` | Dependências Python |
 
 ## Como executar
@@ -19,4 +20,5 @@
 pip install -r requirements.txt
 jupyter notebook          # abrir EDA.ipynb e Proj01.ipynb e usar "Run All"
 ```
-Os notebooks leem os CSV da pasta `data_tiny/` (caminho relativo), por isso devem ser executados a partir da pasta onde estão.
+Os notebooks leem os CSV da pasta `data_tiny/` (caminho relativo), por isso devem ser executados a partir da pasta onde estão, com `model.py` e `algoritmos.py` ao lado.
+
