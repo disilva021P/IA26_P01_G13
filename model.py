@@ -1,13 +1,18 @@
 """
 model.py — Modelo do problema "Comida Local" (Trabalho de IA, UPCA 2026-27).
 
-leitura dos dados, classes Request / Vehicle / State / Problem,
+Contém só o MODELO (sem algoritmos de pesquisa): leitura dos dados, classes Request / Vehicle / State / Problem,
 ações, função de custo e verificador de viabilidade de rotas. Os algoritmos (Greedy, A*, Hill Climbing, CSP)
 importam daqui e usam sempre as mesmas regras.
 
 Terminologia: uma ENCOMENDA (orders) é composta por um ou mais PEDIDOS (linhas de order_items).
 O pedido é a unidade de planeamento: recolher no produtor -> passar pelo centro de recolha (armazém) -> entregar ao cliente.
 
+Restrições
+  hard : recolha dentro de [availability_start, availability_end]; entrega a partir de delivery_start (espera se chegar antes);
+         capacidade do veículo; cada pedido recolhido e entregue exatamente uma vez; todo o produto passa pelo armazém;
+         só se sai do armazém com produtos que já lá chegaram.
+  soft : entrega até delivery_end -> pode ser violada, com penalização LATE_PENALTY por cada minuto de atraso.
 
 Função de custo : custo = distância (km) + LATE_PENALTY * minutos de atraso.
 """
@@ -193,11 +198,97 @@ class Problem:
             status[r], wt[r] = code, w_time
         return State(veh, tuple(status), tuple(wt))
 
+    # ---------------------------------------------------------------- rotas completas
+    def simulate(self, routes, trace=False):
+        """
+        Executa as rotas (uma lista de ações por veículo) com as regras do modelo.
+        Devolve dict(cost, km, late_min, late_by_request, log) ou None se alguma restrição hard for violada.
+        As rotas dos vários veículos são executadas em paralelo: uma ação BLOCKED espera pela de outro veículo.
+        """
+        s, idx, km, late, late_req, log = self.initial_state(), [0] * self.K, 0.0, 0.0, {}, []
+        progress = True
+        while progress:
+            progress = False
+            for v in range(self.K):
+                while idx[v] < len(routes[v]):
+                    act = routes[v][idx[v]]
+                    res = self.apply(s, v, act)
+                    if res is None:
+                        return None
+                    if res is BLOCKED:
+                        break
+                    s2, d_km, d_late = res
+                    km, late = km + d_km, late + d_late
+                    if d_late > 0:
+                        late_req[self.req[act[1]].id] = d_late
+                    if trace:
+                        log.append(dict(vehicle=self.veh[v].id, v=v, act=act[0], r=act[1], loc=s2.veh[v][0],
+                                        t_end=s2.veh[v][1], km=d_km, late=d_late, load=s2.veh[v][2]))
+                    s, idx[v], progress = s2, idx[v] + 1, True
+        if any(idx[v] < len(routes[v]) for v in range(self.K)) or not self.is_goal(s):
+            return None                                       # ações por executar (deadlock) ou pedidos por servir
+        if RETURN_TO_CENTER:
+            for v, (loc, t, _) in enumerate(s.veh):
+                d_km = self.D[loc][self.veh[v].center]
+                km += d_km
+                if trace and d_km > 0:
+                    log.append(dict(vehicle=self.veh[v].id, v=v, act="R", r=None, loc=self.veh[v].center,
+                                    t_end=t + self.T[loc][self.veh[v].center], km=d_km, late=0.0, load=0.0))
+        return dict(cost=self.step_cost(km, late), km=km, late_min=late, late_by_request=late_req, log=log)
+
+    def cost(self, routes):
+        """Função de custo de uma solução completa (inf se inviável)."""
+        res = self.simulate(routes)
+        return res["cost"] if res else math.inf
+
+    def audit(self, routes):
+        """
+        Verificador de viabilidade, a partir do cronograma (não repete a lógica de apply):
+        cada pedido recolhido e entregue 1 vez; recolha dentro da janela; entrega não antes de delivery_start;
+        entrega fisicamente possível (produtor -> centro -> cliente); capacidade. Atrasos face a delivery_end são só reportados.
+        """
+        res = self.simulate(routes, trace=True)
+        if res is None:
+            return dict(ok=False, problemas=["a simulação falhou (restrição hard violada, pedido por servir ou deadlock)"])
+        picks, delivs, load, max_load, problems = {}, {}, [0.0] * self.K, [0.0] * self.K, []
+        for e in res["log"]:
+            v, r = e["v"], e["r"]
+            if e["act"] == PICK:
+                if r in picks: problems.append(f"pedido {self.req[r].id} recolhido mais de uma vez")
+                picks[r] = e["t_end"] - SERVICE_MIN
+                load[v] += self.w[r]
+            elif e["act"] == DELIVER:
+                if r in delivs: problems.append(f"pedido {self.req[r].id} entregue mais de uma vez")
+                delivs[r] = e["t_end"] - SERVICE_MIN
+                load[v] -= self.w[r]
+            max_load[v] = max(max_load[v], load[v])
+        for r, q in enumerate(self.req):
+            if r not in picks or r not in delivs:
+                problems.append(f"pedido {q.id} não servido"); continue
+            if not (q.a - EPS <= picks[r] <= q.a_end + EPS): problems.append(f"pedido {q.id}: recolha às {picks[r]:.0f} fora da janela")
+            if delivs[r] < q.e - EPS: problems.append(f"pedido {q.id}: entregue antes de delivery_start")
+            if delivs[r] < picks[r] + self.T[q.p][self.C] + self.T[self.C][q.d] - 1e-3:   # tolerância > arredondamento (4 casas) do estado
+                problems.append(f"pedido {q.id}: entrega fisicamente impossível")
+        for v in range(self.K):
+            if max_load[v] > self.cap[v] + EPS: problems.append(f"capacidade do veículo {self.veh[v].id} excedida")
+        return dict(ok=not problems, problemas=problems, km=res["km"], atraso_min=res["late_min"], custo=res["cost"],
+                    pedidos_atrasados=res["late_by_request"], carga_max_kg=[round(x, 1) for x in max_load])
+
+    def timeline(self, routes, origin=None):
+        """Cronograma paragem a paragem como DataFrame (com data/hora se `origin` for dado)."""
+        res = self.simulate(routes, trace=True)
+        rows = [dict(veiculo=e["vehicle"], acao=e["act"], pedido=(self.req[e["r"]].id if e["r"] is not None else None),
+                     local=e["loc"], t_fim=e["t_end"], km=round(e["km"], 2), atraso_min=round(e["late"], 1)) for e in res["log"]]
+        out = pd.DataFrame(rows)
+        if origin is not None:
+            out["hora"] = [(origin + pd.Timedelta(minutes=t)).strftime("%d/%m %H:%M") for t in out.t_fim]
+        return out
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Leitura dos dados
 # ----------------------------------------------------------------------------------------------------------------------
-def load_problem(data_dir="data", late_penalty=LATE_PENALTY):
+def load_problem(data_dir="data_tiny", late_penalty=LATE_PENALTY):
     """
     Lê os CSV de `data_dir` e devolve (Problem, origin).
     Os instantes ficam em minutos desde `origin` = 1 dia antes da primeira janela de recolha (os veículos começam no tempo 0).
@@ -237,3 +328,24 @@ if __name__ == "__main__":
     print(f"{P.n} pedidos, {P.K} veículos, centro = location {P.C}, carga total {sum(P.w):.1f} kg")
     late = {r.id: round(P.lateness_best_case(r), 1) for r in P.req if P.lateness_best_case(r) > 0}
     print("Pedidos que não cumprem delivery_end nem no melhor caso (min de atraso):", late)
+
+    # Solução ingénua (só para testar o modelo): por ordem de início da recolha, cada pedido (P, L, D) vai para o primeiro veículo
+    # em que a rota continua viável. As rotas guardam order_item_id; conv() converte para os índices de cada sub-instância.
+    conv = lambda Q, rts: [[(a, None if i is None else [q.id for q in Q.req].index(i)) for a, i in rt] for rt in rts]
+    ids, routes = [], [[] for _ in range(P.K)]
+    for r in sorted(range(P.n), key=lambda r: P.req[r].a):
+        rid = P.req[r].id
+        for v in range(P.K):
+            trial = [list(rt) for rt in routes]
+            trial[v] += [(PICK, rid), (LOAD, rid), (DELIVER, rid)]
+            if P.subset(ids + [rid]).simulate(conv(P.subset(ids + [rid]), trial)):
+                routes, ids = trial, ids + [rid]
+                break
+        else:
+            print(f"  pedido {rid} não cabe em nenhum veículo nesta heurística ingénua (fica por servir)")
+    Q = P.subset(ids)
+    routes = conv(Q, routes)
+    print(f"Rota ingénua: {len(ids)} de {P.n} pedidos servidos")
+    res = Q.simulate(routes)
+    print("Custo:", {k: round(v, 1) for k, v in res.items() if k in ("cost", "km", "late_min")})
+    print("Auditoria:", Q.audit(routes))
