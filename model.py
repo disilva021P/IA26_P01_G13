@@ -8,6 +8,7 @@ importam daqui e usam sempre as mesmas regras.
 Terminologia: uma ENCOMENDA (orders) é composta por um ou mais PEDIDOS (linhas de order_items).
 O pedido é a unidade de planeamento: recolher no produtor -> passar pelo centro de recolha (armazém) -> entregar ao cliente.
 
+
 Função de custo : custo = distância (km) + LATE_PENALTY * minutos de atraso.
 """
 from dataclasses import dataclass

@@ -550,3 +550,25 @@ def initial_solution(P, h=h_chain, weights=(1.0, 2.0, 5.0, 20.0), max_nodes=2000
             return plan_to_routes(P, res["plan"]), res
     res = best_first(P, h, mode="greedy", max_nodes=max_nodes * 5, time_limit=time_limit * 2)
     return (plan_to_routes(P, res["plan"]), res) if res["found"] else (None, None)
+
+def _to_global(P, Q, routes):
+    gi = {q.id: i for i, q in enumerate(P.req)}
+    return [[(a, None if r is None else gi[Q.req[r].id]) for a, r in rt] for rt in routes]
+
+def solve_all(P, improve=True, **kw):
+    """
+    Resolve o problema completo por grupos temporais independentes (A* -> A* ponderado como fallback), opcionalmente
+    melhora cada grupo com Hill Climbing, e junta as rotas. Valida no fim com P.audit (todos os pedidos servidos).
+    """
+    routes, info = [[] for _ in range(P.K)], []
+    for g in temporal_groups(P):
+        Q = P.subset([P.req[r].id for r in g])
+        rt, res = initial_solution(Q, **kw)
+        if rt is None:
+            info.append(dict(ids=[q.id for q in Q.req], found=False)); continue
+        if improve:
+            rt = hill_climbing(Q, rt)["routes"]
+        for v, part in enumerate(_to_global(P, Q, rt)):
+            routes[v] += part
+        info.append(dict(ids=[q.id for q in Q.req], found=True, cost=Q.cost(rt)))
+    return routes, info, P.audit(routes)

@@ -11,7 +11,7 @@
 | `Proj01.ipynb` | Notebook principal: introdução, problema, modelação, resultados e conclusão |
 | `EDA.ipynb` | Análise exploratória dos dados |
 | `model.py` | Modelo do problema: pedidos, veículos, estado, ações, função de custo, simulador e verificador (`audit`) |
-| `algoritmos.py` | Algoritmos: Greedy e A* (`best_first`), Hill Climbing e CSP (`csp_solve`, `csp_complete`) |
+| `algoritmos.py` | Algoritmos: Greedy e A* (`best_first`), Hill Climbing e CSP (`csp_solve`, `csp_complete`), `solve_all` |
 | `data_tiny/` | Dataset (CSV, versão *tiny*): produtores, clientes, encomendas, veículos, matriz de distâncias, etc. |
 | `requirements.txt` | Dependências Python |
 
@@ -22,3 +22,4 @@ jupyter notebook          # abrir EDA.ipynb e Proj01.ipynb e usar "Run All"
 ```
 Os notebooks leem os CSV da pasta `data_tiny/` (caminho relativo), por isso devem ser executados a partir da pasta onde estão, com `model.py` e `algoritmos.py` ao lado.
 
+O `Proj01.ipynb` demora vários minutos a executar (o A* chega aos limites de 200 000 nós / 60 s nos grupos maiores, e as análises do CSP usam até 30 s por grupo).
