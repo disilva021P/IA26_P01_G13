@@ -1,13 +1,18 @@
 """
 model.py — Modelo do problema "Comida Local" (Trabalho de IA, UPCA 2026-27).
 
-leitura dos dados, classes Request / Vehicle / State / Problem,
+Contém só o MODELO (sem algoritmos de pesquisa): leitura dos dados, classes Request / Vehicle / State / Problem,
 ações, função de custo e verificador de viabilidade de rotas. Os algoritmos (Greedy, A*, Hill Climbing, CSP)
 importam daqui e usam sempre as mesmas regras.
 
 Terminologia: uma ENCOMENDA (orders) é composta por um ou mais PEDIDOS (linhas de order_items).
 O pedido é a unidade de planeamento: recolher no produtor -> passar pelo centro de recolha (armazém) -> entregar ao cliente.
 
+Restrições
+  hard : recolha dentro de [availability_start, availability_end]; entrega a partir de delivery_start (espera se chegar antes);
+         capacidade do veículo; cada pedido recolhido e entregue exatamente uma vez; todo o produto passa pelo armazém;
+         só se sai do armazém com produtos que já lá chegaram.
+  soft : entrega até delivery_end -> pode ser violada, com penalização LATE_PENALTY por cada minuto de atraso.
 
 Função de custo : custo = distância (km) + LATE_PENALTY * minutos de atraso.
 """
